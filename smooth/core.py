@@ -130,7 +130,7 @@ class Bezier(object):
         if self.degree == 2:
             middle = self._points[1]
             near = (1.0 - t) * (1.0 - t)
-            hump = (1.0 - t) * t
+            hump = 2.0 * (1.0 - t) * t
             far = t * t
             return (
                 near * first[0] + hump * middle[0] + far * last[0],
@@ -138,8 +138,8 @@ class Bezier(object):
             )
         second, third = self._points[1], self._points[2]
         near = (1.0 - t) ** 3
-        rise = 3.0 * (1.0 - t) * t * t
-        hump = 3.0 * (1.0 - t) * (1.0 - t) * t
+        rise = 3.0 * (1.0 - t) * (1.0 - t) * t
+        hump = 3.0 * (1.0 - t) * t * t
         far = t ** 3
         return (
             near * first[0] + rise * second[0] + hump * third[0] + far * last[0],
@@ -174,7 +174,7 @@ class Bezier(object):
         t = _check_unit(parameter, "a split parameter")
         levels = _de_casteljau(self._points, t)
         left = Bezier([level[0] for level in levels])
-        right = Bezier([level[-1] for level in levels])
+        right = Bezier([level[-1] for level in reversed(levels)])
         return left, right
 
     def segment(self, start, end):
@@ -188,7 +188,7 @@ class Bezier(object):
             return Bezier([held] * len(self._points))
         levels = _de_casteljau(self._points, first)
         tail = [level[-1] for level in reversed(levels)]
-        span = last - first
+        span = (last - first) / (1.0 - first)
         levels = _de_casteljau(tail, span)
         return Bezier([level[0] for level in levels])
 
@@ -199,7 +199,7 @@ class Bezier(object):
         total = 0.0
         previous = self._points[0]
         for index in range(1, steps + 1):
-            current = self.point(index / steps)
+            current = self.point(limit * index / steps)
             total += _spread(previous, current)
             previous = current
         return total
@@ -222,7 +222,7 @@ class Bezier(object):
         steps = _check_steps(steps)
         totals = self._table(steps)
         if walked >= totals[-1]:
-            parameter = (steps - 1.0) / steps
+            parameter = 1.0
             return parameter, self.point(parameter)
         index = 0
         while totals[index + 1] < walked:
@@ -239,7 +239,7 @@ class Bezier(object):
         total = self.length(1.0, steps)
         points = []
         for index in range(wanted):
-            distance = total * index / wanted
+            distance = total * index / (wanted - 1.0)
             points.append(self.at_distance(distance, steps)[1])
         return tuple(points)
 
@@ -258,7 +258,7 @@ def _timing_parameter(x1, y1, x2, y2, target):
     low, high = 0.0, 1.0
     for _ in range(SOLVER_STEPS):
         middle = (low + high) / 2.0
-        if _timing_axis(y1, y2, middle) < target:
+        if _timing_axis(x1, x2, middle) < target:
             low = middle
         else:
             high = middle
